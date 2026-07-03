@@ -8,7 +8,7 @@ const {
 
 router.post("/register", authController.register);
 
-router.post("/login", authController.login);
+router.post("/login", loginLimiter, authController.login);
 
 router.post("/logout", authController.logout);
 
@@ -20,7 +20,7 @@ router.post("/forgot-password", authController.forgotPassword);
 
 router.post("/reset-password", authController.resetPassword);
 
-router.get("/profile", authController.profile);
+router.get("/profile",verifyToken,blacklistMiddleware,sessionMiddleware,authController.profile);
 
 router.put("/profile", authController.updateProfile);
 

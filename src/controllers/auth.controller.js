@@ -1,5 +1,29 @@
 const authService = require("../services/auth.service");
+const sessionService =require("../services/session.service");
+const blacklistService =require("../services/blacklist.service");
+await sessionService.createSession(
 
+    user.id,
+
+    token,
+
+    req
+
+);
+
+await sessionService.deleteSession(
+
+    req.user.id
+
+);
+
+return res.status(200).json({
+
+    success: true,
+
+    message: "Logout Successfully"
+
+});
 async function verifyOTP(req, res) {
 
     try {
@@ -43,6 +67,21 @@ async function register(req, res) {
     }
 }
 
+const authHeader = req.headers.authorization;
+
+const token = authHeader.split(" ")[1];
+
+await blacklistService.blacklistToken(token);
+
+await sessionService.deleteSession(req.user.id);
+
+return res.status(200).json({
+
+    success: true,
+
+    message: "Logout Successful"
+
+});
 module.exports = {
     register,
      verifyOTP

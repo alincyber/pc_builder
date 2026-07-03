@@ -4,7 +4,7 @@ const app = require("./app");
 
 const mysql = require("./config/mysql");
 const connectMongoDB = require("./config/mongo");
-const { connectRedis } = require("./config/reddis");
+const { connectRedis } = require("./config/redis");
 
 const dns = require("dns");
 dns.setServers(["8.8.8.8", "8.8.4.4"]);

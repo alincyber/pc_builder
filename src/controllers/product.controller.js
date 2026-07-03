@@ -1,10 +1,10 @@
 const pool = require("../config/mysql");
-
+const cacheService =require("../services/cache.service");
+const recentService =require("../services/recent.service");
 // =====================================
 // Get Products
 // Search + Pagination + Filter + Sort
 // =====================================
-
 exports.getProducts = async (req, res) => {
 
     try {
@@ -23,6 +23,52 @@ exports.getProducts = async (req, res) => {
         page = Number(page);
         limit = Number(limit);
 
+        // ======================
+// Search Cache
+// ======================
+
+const searchKey = search
+    ? `search:${search.toLowerCase()}`
+    : null;
+
+if (searchKey) {
+
+    const cachedSearch = await cacheService.getCache(searchKey);
+
+    if (cachedSearch) {
+
+        return res.status(200).json({
+
+            source: "Redis Search Cache",
+
+            ...cachedSearch
+
+        });
+
+    }
+
+}
+        // ======================
+        // Redis Cache
+        // ======================
+
+        const cacheKey = `products:${JSON.stringify(req.query)}`;
+
+        const cachedData = await cacheService.getCache(cacheKey);
+
+        if (cachedData) {
+
+            return res.status(200).json({
+
+                source: "Redis",
+
+                ...cachedData
+
+            });
+
+        }
+
+        
         const offset = (page - 1) * limit;
 
         let where = [];
@@ -131,7 +177,7 @@ exports.getProducts = async (req, res) => {
         }
 
         // ======================
-        // Total Products
+        // Count Products
         // ======================
 
         const [countResult] = await pool.query(
@@ -147,7 +193,7 @@ exports.getProducts = async (req, res) => {
         const total = countResult[0].total;
 
         // ======================
-        // Get Products
+        // Fetch Products
         // ======================
 
         const [products] = await pool.query(
@@ -180,7 +226,7 @@ exports.getProducts = async (req, res) => {
 
         );
 
-        return res.status(200).json({
+        const response = {
 
             success: true,
 
@@ -194,6 +240,46 @@ exports.getProducts = async (req, res) => {
 
             products
 
+        };
+
+        // ======================
+        // Save Cache
+        // ======================
+
+        await cacheService.setCache(
+
+            cacheKey,
+
+            response,
+
+            300
+
+        );
+
+        // ======================
+// Save Search Cache
+// ======================
+
+if (searchKey) {
+
+    await cacheService.setCache(
+
+        searchKey,
+
+        response,
+
+        300
+
+    );
+
+}
+
+        return res.status(200).json({
+
+            source: "MySQL",
+
+            ...response
+
         });
 
     } catch (error) {
@@ -203,6 +289,7 @@ exports.getProducts = async (req, res) => {
         return res.status(500).json({
 
             success: false,
+
             message: "Internal Server Error"
 
         });
@@ -210,7 +297,6 @@ exports.getProducts = async (req, res) => {
     }
 
 };
-
 
 // =====================================
 // Get Product By ID
@@ -227,10 +313,14 @@ exports.getProductById = async (req, res) => {
         // ===========================
 
         if (!id) {
+
             return res.status(400).json({
+
                 success: false,
                 message: "Product ID is required."
+
             });
+
         }
 
         // ===========================
@@ -284,9 +374,27 @@ exports.getProductById = async (req, res) => {
         if (products.length === 0) {
 
             return res.status(404).json({
+
                 success: false,
                 message: "Product not found."
+
             });
+
+        }
+
+        // ===========================
+        // Save Recently Viewed Product
+        // ===========================
+
+        if (req.user && req.user.id) {
+
+            await recentService.addRecentProduct(
+
+                req.user.id,
+
+                id
+
+            );
 
         }
 
@@ -297,6 +405,7 @@ exports.getProductById = async (req, res) => {
         return res.status(200).json({
 
             success: true,
+
             product: products[0]
 
         });
@@ -315,8 +424,6 @@ exports.getProductById = async (req, res) => {
     }
 
 };
-
-
 // =====================================
 // Create Product
 // =====================================
@@ -816,4 +923,98 @@ exports.deleteProduct = async (req, res) => {
 
 };
 
+exports.getRecentlyViewed = async (req, res) => {
 
+    try {
+
+        // =============================
+        // Get Product IDs From Redis
+        // =============================
+
+        const ids = await recentService.getRecentProducts(req.user.id);
+
+        if (!ids || ids.length === 0) {
+
+            return res.status(200).json({
+
+                success: true,
+
+                count: 0,
+
+                products: []
+
+            });
+
+        }
+
+        // =============================
+        // Create Placeholders
+        // =============================
+
+        const placeholders = ids.map(() => "?").join(",");
+
+        // =============================
+        // Fetch Products From MySQL
+        // =============================
+
+        const [products] = await pool.query(
+
+            `SELECT
+
+                p.id,
+                p.name,
+                p.slug,
+                p.sku,
+                p.price,
+                p.discount_price,
+                p.stock,
+                p.thumbnail,
+                p.status
+
+            FROM products p
+
+            WHERE p.id IN (${placeholders})`,
+
+            ids
+
+        );
+
+        // =============================
+        // Keep Redis Order
+        // =============================
+
+        const sortedProducts = ids.map(id =>
+
+            products.find(product => product.id == id)
+
+        ).filter(Boolean);
+
+        // =============================
+        // Response
+        // =============================
+
+        return res.status(200).json({
+
+            success: true,
+
+            count: sortedProducts.length,
+
+            products: sortedProducts
+
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: "Internal Server Error"
+
+        });
+
+    }
+
+};

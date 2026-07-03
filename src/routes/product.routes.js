@@ -9,6 +9,7 @@ const upload = require("../middleware/upload.middleware");
 // Products
 router.get("/", productController.getProducts);
 
+router.get("/recent",productController.getRecentlyViewed);
 router.get("/:id", productController.getProductById);
 
 router.post(

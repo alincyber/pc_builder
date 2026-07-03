@@ -1,6 +1,7 @@
 const pool = require("../config/mysql");
 const bcrypt = require("bcrypt");
 const { generateToken } = require("../utils/jwt");
+const logActivity = require("../utils/activityLogger");
 // ==============================
 // Get All Users
 // ==============================
