@@ -118,3 +118,49 @@ exports.checkStock = async (connection, items) => {
 
     return { success: true };
 };
+
+// ======================================
+// Cancel Order
+// ======================================
+
+exports.cancelOrder = async (connection, orderId) => {
+
+    await connection.query(
+
+        `UPDATE orders
+         SET status = 'cancelled'
+         WHERE id = ?`,
+
+        [orderId]
+
+    );
+
+};
+
+// ======================================
+// Restore Product Stock
+// ======================================
+
+exports.restoreStock = async (connection, orderItems) => {
+
+    for (const item of orderItems) {
+
+        await connection.query(
+
+            `UPDATE products
+             SET stock = stock + ?
+             WHERE id = ?`,
+
+            [
+
+                item.quantity,
+
+                item.product_id
+
+            ]
+
+        );
+
+    }
+
+};

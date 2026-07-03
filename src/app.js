@@ -23,6 +23,11 @@ const activityRoutes = require("./routes/activity.routes");
 const wishlistRoutes =require("./routes/wishlist.routes");
 const otpRoutes =require("./routes/otp.routes");
 const cartRoutes = require("./routes/cart.routes");
+const orderRoutes = require("./routes/order.routes");
+const adminRoutes = require("./routes/admin.routes");
+
+
+
 
 
 app.use("/api/product-images",productImageRoutes);
@@ -37,4 +42,7 @@ app.use("/api/activity", activityRoutes);
 app.use("/api/wishlist",wishlistRoutes);
 app.use("/api/otp",otpRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/admin", adminRoutes);
+
 module.exports = app;

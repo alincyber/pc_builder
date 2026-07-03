@@ -1,4 +1,4 @@
-const Notification =require("../models/notification.model");
+const Notification =require("../models/Notification");
 
 exports.createNotification = async (req,res)=>{
 
