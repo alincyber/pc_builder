@@ -2,14 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 const path = require("path");
-const rateLimiter =
-require("./middleware/rateLimiter.middleware");
-app.use(rateLimiter);
 app.use(express.json());
-app.use(
-    "/uploads",
-    express.static(path.join(__dirname, "uploads"))
-);
+app.use("/uploads",express.static(path.join(__dirname, "uploads")));
 app.use(cors());
 const userRoutes = require("./routes/user.routes");
 const categoryRoutes = require("./routes/category.routes"); // ✅ Add this line
@@ -27,9 +21,13 @@ const orderRoutes = require("./routes/order.routes");
 const adminRoutes = require("./routes/admin.routes");
 
 
+// Routes...
 
 
 
+
+
+app.use("/api/admin", adminRoutes);
 app.use("/api/product-images",productImageRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/categories", categoryRoutes);
