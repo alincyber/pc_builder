@@ -1,4 +1,4 @@
-const Activity = require("../models/OrderActivity");
+const Activity = require("../models/activity.model");
 
 // ======================================
 // Create Activity

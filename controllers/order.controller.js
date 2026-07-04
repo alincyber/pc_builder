@@ -8,7 +8,7 @@ const notificationService = require("../services/notification.service");
 
 const cacheService = require("../services/cache.service");
 
-const OrderActivity = require("../models/OrderActivity");
+const OrderActivity = require("../models/activity.model");
 
 // ======================================
 // Get My Orders
