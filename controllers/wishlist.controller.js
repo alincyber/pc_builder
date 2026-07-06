@@ -1,172 +1,85 @@
-const Wishlist = require("../models/wishlist.model");
+const pool = require("../config/mysql");
+const wishlistService = require("../services/wishlist.service");
+const cartService = require("../services/cart.service");
+// ======================================
+// Add Product To Wishlist
+// ======================================
 
-// =====================================
-// Add Product
-// =====================================
+exports.addToWishlist = async (req, res) => {
 
-exports.addToWishlist = async (req,res)=>{
+    try {
 
-    try{
+        const userId = req.user.id;
 
-        const {
+        const { productId } = req.body;
 
-            userId,
+        if (!productId) {
 
-            productId
+            return res.status(400).json({
 
-        } = req.body;
+                success: false,
 
-        let wishlist = await Wishlist.findOne({
-
-            userId
-
-        });
-
-        if(!wishlist){
-
-            wishlist = new Wishlist({
-
-                userId,
-
-                products:[productId]
+                message: "Product ID is required."
 
             });
 
-        }else{
-
-            if(!wishlist.products.includes(productId)){
-
-                wishlist.products.push(productId);
-
-            }
-
         }
 
-        await wishlist.save();
+        // Check Product Exists
+        const [products] = await pool.query(
 
-        res.status(200).json({
+            `SELECT
+                id,
+                name,
+                price,
+                stock,
+                thumbnail
+             FROM products
+             WHERE id = ?`,
 
-            success:true,
+            [productId]
 
-            message:"Product added to wishlist.",
+        );
 
-            wishlist
-
-        });
-
-    }catch(error){
-
-        console.error(error);
-
-        res.status(500).json({
-
-            success:false,
-
-            message:"Internal Server Error"
-
-        });
-
-    }
-
-};
-
-// =====================================
-// Get Wishlist
-// =====================================
-
-exports.getWishlist = async(req,res)=>{
-
-    try{
-
-        const wishlist = await Wishlist.findOne({
-
-            userId:req.params.userId
-
-        });
-
-        res.status(200).json({
-
-            success:true,
-
-            wishlist
-
-        });
-
-    }catch(error){
-
-        console.error(error);
-
-        res.status(500).json({
-
-            success:false,
-
-            message:"Internal Server Error"
-
-        });
-
-    }
-
-};
-
-// =====================================
-// Remove Product
-// =====================================
-
-exports.removeFromWishlist = async(req,res)=>{
-
-    try{
-
-        const {
-
-            userId,
-
-            productId
-
-        } = req.params;
-
-        const wishlist = await Wishlist.findOne({
-
-            userId
-
-        });
-
-        if(!wishlist){
+        if (products.length === 0) {
 
             return res.status(404).json({
 
-                success:false,
+                success: false,
 
-                message:"Wishlist not found."
+                message: "Product not found."
 
             });
 
         }
 
-        wishlist.products = wishlist.products.filter(
+        const wishlist = await wishlistService.addToWishlist(
 
-            id=>id!=productId
+            userId,
+
+            productId
 
         );
 
-        await wishlist.save();
+        return res.status(200).json({
 
-        res.status(200).json({
+            success: true,
 
-            success:true,
+            message: "Product added to wishlist.",
 
-            message:"Removed Successfully."
+            wishlist
 
         });
 
-    }catch(error){
+    } catch (error) {
 
         console.error(error);
 
-        res.status(500).json({
+        return res.status(500).json({
 
-            success:false,
+            success: false,
 
-            message:"Internal Server Error"
+            message: "Internal Server Error"
 
         });
 
@@ -174,47 +87,294 @@ exports.removeFromWishlist = async(req,res)=>{
 
 };
 
-// =====================================
-// Clear Wishlist
-// =====================================
+// ======================================
+// Get Wishlist
+// ======================================
 
-exports.clearWishlist = async(req,res)=>{
+exports.getWishlist = async (req, res) => {
 
-    try{
+    try {
 
-        await Wishlist.findOneAndUpdate(
+        const userId = req.user.id;
 
-            {
+        const wishlist = await wishlistService.getWishlist(userId);
 
-                userId:req.params.userId
+        if (!wishlist || wishlist.products.length === 0) {
 
-            },
+            return res.status(200).json({
 
-            {
+                success: true,
 
-                products:[]
+                count: 0,
 
-            }
+                wishlist: []
+
+            });
+
+        }
+
+        const ids = wishlist.products.map(
+
+            item => item.productId
 
         );
 
-        res.status(200).json({
+        const placeholders = ids.map(() => "?").join(",");
 
-            success:true,
+        const [products] = await pool.query(
 
-            message:"Wishlist Cleared."
+            `SELECT
+                id,
+                name,
+                price,
+                stock,
+                thumbnail
+             FROM products
+             WHERE id IN (${placeholders})`,
+
+            ids
+
+        );
+
+        return res.status(200).json({
+
+            success: true,
+
+            count: products.length,
+
+            wishlist: products
 
         });
 
-    }catch(error){
+    } catch (error) {
 
         console.error(error);
 
-        res.status(500).json({
+        return res.status(500).json({
 
-            success:false,
+            success: false,
 
-            message:"Internal Server Error"
+            message: "Internal Server Error"
+
+        });
+
+    }
+
+};
+
+// ======================================
+// Remove Product
+// ======================================
+
+exports.removeFromWishlist = async (req, res) => {
+
+    try {
+
+        const userId = req.user.id;
+
+        const { productId } = req.params;
+
+        const wishlist = await wishlistService.removeFromWishlist(
+
+            userId,
+
+            productId
+
+        );
+
+        return res.status(200).json({
+
+            success: true,
+
+            message: "Product removed from wishlist.",
+
+            wishlist
+
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: "Internal Server Error"
+
+        });
+
+    }
+
+};
+
+// ======================================
+// Wishlist Count
+// ======================================
+
+exports.getWishlistCount = async (req, res) => {
+
+    try {
+
+        const userId = req.user.id;
+
+        const count = await wishlistService.getWishlistCount(
+
+            userId
+
+        );
+
+        return res.status(200).json({
+
+            success: true,
+
+            count
+
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: "Internal Server Error"
+
+        });
+
+    }
+
+};
+
+// ======================================
+// Clear Wishlist
+// ======================================
+
+exports.clearWishlist = async (req, res) => {
+
+    try {
+
+        const userId = req.user.id;
+
+        await wishlistService.clearWishlist(userId);
+
+        return res.status(200).json({
+
+            success: true,
+
+            message: "Wishlist cleared successfully."
+
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: "Internal Server Error"
+
+        });
+
+    }
+
+};
+
+// ======================================
+// Move Wishlist Product To Cart
+// ======================================
+
+exports.moveToCart = async (req, res) => {
+
+    try {
+
+        const userId = req.user.id;
+
+        const { productId } = req.params;
+
+        // Check Product
+
+        const [products] = await pool.query(
+
+            `SELECT
+                id,
+                stock
+             FROM products
+             WHERE id = ?`,
+
+            [productId]
+
+        );
+
+        if (products.length === 0) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message: "Product not found."
+
+            });
+
+        }
+
+        if (products[0].stock <= 0) {
+
+            return res.status(400).json({
+
+                success: false,
+
+                message: "Product is out of stock."
+
+            });
+
+        }
+
+        // Add To Redis Cart
+
+        await cartService.addToCart(
+
+            userId,
+
+            productId,
+
+            1
+
+        );
+
+        // Remove From Wishlist
+
+        await wishlistService.removeFromWishlist(
+
+            userId,
+
+            productId
+
+        );
+
+        return res.status(200).json({
+
+            success: true,
+
+            message: "Product moved to cart successfully."
+
+        });
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: "Internal Server Error"
 
         });
 

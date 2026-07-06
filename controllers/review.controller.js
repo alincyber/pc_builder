@@ -1,28 +1,25 @@
-const Review = require("../models/review.model");
+const pool = require("../config/mysql");
+const reviewService = require("../services/review.service");
 
-// =====================================
+// ======================================
 // Add Review
-// =====================================
+// ======================================
 
 exports.addReview = async (req, res) => {
 
     try {
 
+        const userId = req.user.id;
+
         const {
 
             productId,
-            userId,
             rating,
             review
 
         } = req.body;
 
-        if (
-            !productId ||
-            !userId ||
-            !rating ||
-            !review
-        ) {
+        if (!productId || !rating || !review) {
 
             return res.status(400).json({
 
@@ -33,10 +30,44 @@ exports.addReview = async (req, res) => {
 
         }
 
-        const newReview = await Review.create({
+        if (rating < 1 || rating > 5) {
 
-            productId,
+            return res.status(400).json({
+
+                success: false,
+                message: "Rating must be between 1 and 5."
+
+            });
+
+        }
+
+        // Check Product
+
+        const [products] = await pool.query(
+
+            `SELECT id
+             FROM products
+             WHERE id = ?`,
+
+            [productId]
+
+        );
+
+        if (products.length === 0) {
+
+            return res.status(404).json({
+
+                success: false,
+                message: "Product not found."
+
+            });
+
+        }
+
+        const newReview = await reviewService.addReview({
+
             userId,
+            productId,
             rating,
             review
 
@@ -45,9 +76,7 @@ exports.addReview = async (req, res) => {
         return res.status(201).json({
 
             success: true,
-
             message: "Review added successfully.",
-
             review: newReview
 
         });
@@ -59,8 +88,7 @@ exports.addReview = async (req, res) => {
         return res.status(500).json({
 
             success: false,
-
-            message: "Internal Server Error"
+            message: error.message
 
         });
 
@@ -69,22 +97,21 @@ exports.addReview = async (req, res) => {
 };
 
 // ======================================
-// Get All Reviews
+// Get Product Reviews
 // ======================================
 
-exports.getReviews = async (req, res) => {
+exports.getProductReviews = async (req, res) => {
 
     try {
 
-        const reviews = await Review.find()
-            .sort({ createdAt: -1 });
+        const { productId } = req.params;
+
+        const reviews = await reviewService.getProductReviews(productId);
 
         return res.status(200).json({
 
             success: true,
-
             count: reviews.length,
-
             reviews
 
         });
@@ -105,85 +132,33 @@ exports.getReviews = async (req, res) => {
 };
 
 // ======================================
-// Get Review By ID
+// Get My Reviews
 // ======================================
 
-exports.getReviewById = async (req, res) => {
+exports.getMyReviews = async (req, res) => {
 
     try {
 
-        const review = await Review.findById(req.params.id);
+        const userId = req.user.id;
 
-        if (!review) {
-
-            return res.status(404).json({
-
-                success:false,
-                message:"Review not found."
-
-            });
-
-        }
+        const reviews = await reviewService.getUserReviews(userId);
 
         return res.status(200).json({
 
-            success:true,
-
-            review
-
-        });
-
-    } catch(error){
-
-        console.error(error);
-
-        return res.status(500).json({
-
-            success:false,
-            message:"Internal Server Error"
-
-        });
-
-    }
-
-};
-
-// ======================================
-// Get Product Reviews
-// ======================================
-
-exports.getProductReviews = async (req,res)=>{
-
-    try{
-
-        const reviews = await Review.find({
-
-            productId:req.params.productId
-
-        }).sort({
-
-            createdAt:-1
-
-        });
-
-        return res.status(200).json({
-
-            success:true,
-
-            count:reviews.length,
-
+            success: true,
+            count: reviews.length,
             reviews
 
         });
 
-    }catch(error){
+    } catch (error) {
 
         console.error(error);
 
         return res.status(500).json({
 
-            success:false,
-            message:"Internal Server Error"
+            success: false,
+            message: "Internal Server Error"
 
         });
 
@@ -195,30 +170,40 @@ exports.getProductReviews = async (req,res)=>{
 // Update Review
 // ======================================
 
-exports.updateReview = async (req,res)=>{
+exports.updateReview = async (req, res) => {
 
-    try{
+    try {
 
-        const review = await Review.findByIdAndUpdate(
+        const userId = req.user.id;
 
-            req.params.id,
+        const { reviewId } = req.params;
 
-            req.body,
+        const {
 
+            rating,
+            review
+
+        } = req.body;
+
+        const updated = await reviewService.updateReview(
+
+            reviewId,
+            userId,
             {
 
-                new:true
+                rating,
+                review
 
             }
 
         );
 
-        if(!review){
+        if (!updated) {
 
             return res.status(404).json({
 
-                success:false,
-                message:"Review not found."
+                success: false,
+                message: "Review not found."
 
             });
 
@@ -226,22 +211,20 @@ exports.updateReview = async (req,res)=>{
 
         return res.status(200).json({
 
-            success:true,
-
-            message:"Review updated.",
-
-            review
+            success: true,
+            message: "Review updated successfully.",
+            review: updated
 
         });
 
-    }catch(error){
+    } catch (error) {
 
         console.error(error);
 
         return res.status(500).json({
 
-            success:false,
-            message:"Internal Server Error"
+            success: false,
+            message: "Internal Server Error"
 
         });
 
@@ -253,22 +236,27 @@ exports.updateReview = async (req,res)=>{
 // Delete Review
 // ======================================
 
-exports.deleteReview = async (req,res)=>{
+exports.deleteReview = async (req, res) => {
 
-    try{
+    try {
 
-        const review = await Review.findByIdAndDelete(
+        const userId = req.user.id;
 
-            req.params.id
+        const { reviewId } = req.params;
+
+        const deleted = await reviewService.deleteReview(
+
+            reviewId,
+            userId
 
         );
 
-        if(!review){
+        if (!deleted) {
 
             return res.status(404).json({
 
-                success:false,
-                message:"Review not found."
+                success: false,
+                message: "Review not found."
 
             });
 
@@ -276,20 +264,19 @@ exports.deleteReview = async (req,res)=>{
 
         return res.status(200).json({
 
-            success:true,
-
-            message:"Review deleted."
+            success: true,
+            message: "Review deleted successfully."
 
         });
 
-    }catch(error){
+    } catch (error) {
 
         console.error(error);
 
         return res.status(500).json({
 
-            success:false,
-            message:"Internal Server Error"
+            success: false,
+            message: "Internal Server Error"
 
         });
 
@@ -298,46 +285,32 @@ exports.deleteReview = async (req,res)=>{
 };
 
 // ======================================
-// Like Review
+// Review Summary
 // ======================================
 
-exports.likeReview = async (req,res)=>{
+exports.getReviewSummary = async (req, res) => {
 
-    try{
+    try {
 
-        const review = await Review.findById(req.params.id);
+        const { productId } = req.params;
 
-        if(!review){
-
-            return res.status(404).json({
-
-                success:false,
-                message:"Review not found."
-
-            });
-
-        }
-
-        review.likes++;
-
-        await review.save();
+        const summary = await reviewService.getReviewSummary(productId);
 
         return res.status(200).json({
 
-            success:true,
-
-            likes:review.likes
+            success: true,
+            summary
 
         });
 
-    }catch(error){
+    } catch (error) {
 
         console.error(error);
 
         return res.status(500).json({
 
-            success:false,
-            message:"Internal Server Error"
+            success: false,
+            message: "Internal Server Error"
 
         });
 

@@ -2,12 +2,12 @@ const mongoose = require("mongoose");
 
 const reviewSchema = new mongoose.Schema({
 
-    productId: {
+    userId: {
         type: Number,
         required: true
     },
 
-    userId: {
+    productId: {
         type: Number,
         required: true
     },
@@ -23,26 +23,18 @@ const reviewSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true
-    },
-
-    verifiedPurchase: {
-        type: Boolean,
-        default: false
-    },
-
-    likes: {
-        type: Number,
-        default: 0
-    },
-
-    images: [{
-        type: String
-    }]
+    }
 
 }, {
-
     timestamps: true
-
 });
 
-module.exports = mongoose.model("Review", reviewSchema);
+// Prevent duplicate reviews from the same user
+reviewSchema.index(
+    { userId: 1, productId: 1 },
+    { unique: true }
+);
+
+module.exports =
+    mongoose.models.Review ||
+    mongoose.model("Review", reviewSchema);
